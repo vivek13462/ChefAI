@@ -36,22 +36,50 @@ def build_report(items):
         row["line_total"] = row["qty"] * row["unit_price"]
     total = sum(row["line_total"] for row in items)
 
-    lines = [f"{PROJECT} — today's shipment", "-" * 78]
+    lines = [f"{PROJECT} — today's shipment"]
     for row in items:
         lines.append(
-            f"{row['item']:<22} {row['vendor']:<24} "
-            f"qty {row['qty']:>3}  @ ${row['unit_price']:>6.2f}  = ${row['line_total']:>7.2f}"
+            f"{row['item']} | {row['vendor']} | qty {row['qty']} | "
+            f"${row['unit_price']:.2f} | ${row['line_total']:.2f}"
         )
-    lines.append("-" * 78)
     lines.append(f"TODAY TOTAL: ${total:.2f}")
     return "\n".join(lines), total
 
 
-def ask_chef(key, model, report_text):
+def format_table(items, total):
+    """Apply the format-expense-table skill: formatting only, numbers come from Python."""
+    headers = ["Item", "Vendor", "Qty", "Unit price", "Line total"]
+    rows = [
+        [r["item"], r["vendor"], str(r["qty"]), f"${r['unit_price']:.2f}", f"${r['line_total']:.2f}"]
+        for r in items
+    ]
+    total_row = ["TOTAL", "", "", "", f"${total:.2f}"]
+    right = {2, 3, 4}
+
+    widths = [
+        max(len(line[i]) for line in [headers] + rows + [total_row])
+        for i in range(len(headers))
+    ]
+
+    def fmt(cells):
+        return " | ".join(
+            c.rjust(widths[i]) if i in right else c.ljust(widths[i])
+            for i, c in enumerate(cells)
+        )
+
+    separator = "-+-".join("-" * w for w in widths)
+    lines = [f"{PROJECT} — today's shipment (formatted)", fmt(headers), separator]
+    lines += [fmt(r) for r in rows]
+    lines.append(fmt(total_row))
+    return "\n".join(lines)
+
+
+def ask_chef(key, model, table_text, skill_text):
     prompt = (
-        "Here is today's delivery for our restaurant kitchen. The math is already computed; "
-        "do not recalculate it.\n\n"
-        f"{report_text}\n\n"
+        "Here is today's delivery for our restaurant kitchen, already formatted using this skill:\n\n"
+        f"{skill_text}\n\n"
+        "The numbers are final; do not recalculate or change them.\n\n"
+        f"{table_text}\n\n"
         "In two sentences, say what a chef would say about today's delivery spend."
     )
     body = json.dumps({
@@ -74,8 +102,25 @@ def ask_chef(key, model, report_text):
 
 def main():
     load_env_file()
-    report_text, _ = build_report(SHIPMENT)
+    report_text, total = build_report(SHIPMENT)
     print(report_text)
+
+    print()
+    print("=" * 60)
+    print("Applying the skill now.")
+    print("=" * 60)
+    print()
+
+    skill_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "SKILL.md")
+    try:
+        with open(skill_path, encoding="utf-8") as f:
+            skill_text = f.read()
+    except OSError:
+        print("SKILL.md not found next to Agent.py; skipping the formatted table.")
+        return
+
+    table_text = format_table(SHIPMENT, total)
+    print(table_text)
     print()
 
     key = os.getenv("LLM_API_KEY")
@@ -86,7 +131,7 @@ def main():
         return
 
     try:
-        answer = ask_chef(key, model, report_text)
+        answer = ask_chef(key, model, table_text, skill_text)
         print("Chef says:")
         print(answer)
     except urllib.error.HTTPError as e:
