@@ -12,11 +12,20 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-MCP_SERVER_PY = r"C:\InvoiceMCP\server.py"
+MCP_SERVER_PY = r"C:\Utils\MCP\AIS-CWD\InvoiceMCP\server.py"
 MCP_HTTP_URL = "http://127.0.0.1:8765/mcp"
 
 PROJECT = "ChefAI"
 API_URL = "https://api.openai.com/v1/chat/completions"
+MCP_ENV_ALLOWLIST = {
+    "PATH",
+    "PATHEXT",
+    "SYSTEMROOT",
+    "TEMP",
+    "TMP",
+    "TMPDIR",
+    "WINDIR",
+}
 
 SHIPMENT = [
     {"item": "Roma tomatoes", "vendor": "FreshFarm Produce", "qty": 12, "unit_price": 1.25},
@@ -145,11 +154,21 @@ class McpError(Exception):
     pass
 
 
+def build_mcp_env():
+    allowed = {name.casefold() for name in MCP_ENV_ALLOWLIST}
+    env = {
+        name: value
+        for name, value in os.environ.items()
+        if name.casefold() in allowed
+    }
+    env["PYTHONUTF8"] = "1"
+    return env
+
+
 class StdioMcp:
     """Launches server.py with this machine's Python and talks newline-delimited JSON-RPC."""
 
     def __init__(self, server_py):
-        env = dict(os.environ, PYTHONUTF8="1")
         self.proc = subprocess.Popen(
             [sys.executable, server_py],
             stdin=subprocess.PIPE,
@@ -158,7 +177,7 @@ class StdioMcp:
             cwd=os.path.dirname(os.path.abspath(server_py)),
             text=True,
             encoding="utf-8",
-            env=env,
+            env=build_mcp_env(),
         )
         self.lines = queue.Queue()
         self.next_id = 0

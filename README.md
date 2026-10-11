@@ -13,7 +13,7 @@ ChefAI step 1: hardcoded today's shipment expenses printed in the terminal.
 - `SKILL.md` (skill `format-expense-table`) is loaded by `Agent.py` and used only for the second, formatted table.
 - The first report is the plain step 1 output; the totals are always computed in Python, never by the LLM.
 
-## Step 3: MCP client
+## Step 4: MCP client
 
 `Agent.py` can connect to a separate, standalone MCP server (not part of this folder).
 
@@ -23,3 +23,4 @@ ChefAI step 1: hardcoded today's shipment expenses printed in the terminal.
 - After connecting, the LLM plans the tool calls to produce the three invoices. Then you can ask more questions. Type Q to quit.
 - The planner maps years and singular/plural item words. Invalid or null tool names are skipped, not sent to MCP.
 - The MCP client uses only the standard library (`subprocess`, `urllib`); no pip packages.
+- The STDIO server receives only a minimal set of operating-system environment variables; credentials such as `LLM_API_KEY` remain in the ChefAI process.
